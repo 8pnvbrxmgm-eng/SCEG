@@ -1030,7 +1030,7 @@ function rejectPayment(id){
 }
 function saveGeminiKey(){
   const key=document.getElementById('gemini-key-input').value.trim();
-  if(!key||!key.startsWith('AIza')){toast('Clé API Gemini invalide (doit commencer par AIza)','var(--danger)');return}
+  if(!key){toast('Clé API Gemini invalide (doit commencer par AIza)','var(--danger)');return}
   localStorage.setItem('sceg_gemini_key',key);
   document.getElementById('apikey-status').textContent='Clé configurée et active';
   document.getElementById('apikey-status').style.color='var(--ok)';
