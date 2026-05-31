@@ -871,7 +871,7 @@ async function sendMsg(){
     const hist=(DB.convs[key]||[]).slice(-12).map(m=>({role:m.role==='ai'?'model':'user',parts:[{text:m.content}]}));
     const sysPrompt=buildPrompt(); 
    const body={
-model:'google/gemini-2.0-flash-exp:free',
+model:'mistralai/-7b-instruct:free',
 messages:[
 {role:'system',content:sysPrompt},
 ...( DB.convs[key]||[]).slice(-12).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.content})),
