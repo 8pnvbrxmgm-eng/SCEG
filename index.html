@@ -846,7 +846,7 @@ async function sendMsg(){
   if(!CU){showScreen('auth');return}
   if(!isPrem()&&(CU.questionsToday||0)>=3){toast('Limite 3 questions/jour. Passez Premium !','var(--danger)');openPayment('weekly');return}
 
-  const apiKey=localStorage.getItem('sceg_gemini_key')||'';
+  const apiKey='sk-or-v1-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||'';
   if(!apiKey){toast('Clé API Gemini non configurée. Contactez l\'admin.','var(--danger)');return}
 
   const msg=txt||(attached?`[Fichier : ${attached.name}]`:'');
@@ -1042,40 +1042,6 @@ function exportUsers(){
 function clearOldData(){toast('Données nettoyées','var(--ok)') }
 </script>
 </body>
-<script>
-async function askGemini(question) {
-const API_KEY = "COLLE_TA_CLE_ICI";
-const response = await fetch(
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
-{
-method: "POST",
-headers: {"Content-Type": "application/json"},
-body: JSON.stringify({
-contents: [{parts: [{text: question}]}]
-})
-}
-);
-const data = await response.json();
-return data.candidates[0].content.parts[0].text;
-}
-</script>
-<script>
-async function askGemini(question) {
-const API_KEY = "COLLE_TA_CLE_ICI";
-const response = await fetch(
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
-{
-method: "POST",
-headers: {"Content-Type": "application/json"},
-body: JSON.stringify({
-contents: [{parts: [{text: question}]}]
-})
-}
-);
-const data = await response.json();
-return data.candidates[0].content.parts[0].text;
-}
-</script>
 <script>
 async function askGemini(question) {
 const API_KEY = "COLLE_TA_CLE_ICI";
