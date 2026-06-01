@@ -426,7 +426,7 @@ h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif}
 
     <div class="hero-nums">
       <div class="hero-num"><div class="n">7+</div><div class="l">Spécialités</div></div>
-      <div class="hero-num"><div class="n">Gemini</div><div class="l">Intelligence IA</div></div>
+      <div class="hero-num"><div class="n">Gemini 2.0</div><div class="l">Intelligence IA</div></div>
       <div class="hero-num"><div class="n">24/7</div><div class="l">Disponible</div></div>
       <div class="hero-num"><div class="n">100%</div><div class="l">Spécialisé SCEG</div></div>
     </div>
@@ -672,12 +672,12 @@ h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif}
         <div id="pending-payments"></div>
       </div>
       <div style="background:var(--ink2);border:1px solid var(--line);border-radius:var(--r);padding:1.5rem">
-        <h3 style="font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:600;margin-bottom:1rem">Configuration Gemini</h3>
+        <h3 style="font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:600;margin-bottom:1rem">Configuration OpenRouter (clé sk-or-...)</h3>
         <div style="display:flex;flex-direction:column;gap:.75rem">
           <div style="background:var(--ink3);border-radius:var(--r-s);padding:.875rem;border:1px solid var(--line)">
-            <div style="font-size:.73rem;color:var(--mist);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Clé API Gemini</div>
+            <div style="font-size:.73rem;color:var(--mist);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Clé API OpenRouter</div>
             <div style="display:flex;gap:8px">
-              <input type="password" id="gemini-key-input" placeholder="AIza..." style="flex:1;padding:6px 10px;background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--snow);font-size:.8rem;outline:none;font-family:'Outfit',sans-serif">
+              <input type="password" id="gemini-key-input" placeholder="sk-or-..." style="flex:1;padding:6px 10px;background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--snow);font-size:.8rem;outline:none;font-family:'Outfit',sans-serif">
               <button class="btn btn-em" style="padding:6px 12px;font-size:.8rem" onclick="saveGeminiKey()">Enregistrer</button>
             </div>
             <div id="apikey-status" style="font-size:.73rem;margin-top:6px;color:var(--ghost)">Non configurée</div>
@@ -813,7 +813,7 @@ function isPrem(){
 /* ══ CHAT ══ */
 function showWelcome(){
   const c=document.getElementById('messages');c.innerHTML='';
-  bubble('ai',`Bonjour ${CU.name} !\n\nJe suis votre assistant SCEG Wiki, alimenté par **Gemini Pro** d'intelligence artificielle avancée.\n\nJe peux vous aider en :\n• **Mathématiques** : Algèbre, Analyse, Séries, Intégrales\n• **Stats et Probabilités** : Lois, Tests, Régression\n• **Économie** : Microéconomie, Macroéconomie, Théories\n• **Informatique** : Python, Excel\n• **Spécialités Master** : Finance, Comptabilité, Management, RH, Marketing\n\nPosez votre première question !`);
+  bubble('ai',`Bonjour ${CU.name} !\n\nJe suis votre assistant SCEG Wiki, alimenté par **Gemini 2.0 Flash** via OpenRouter.\n\nJe peux vous aider en :\n• **Mathématiques** : Algèbre, Analyse, Séries, Intégrales\n• **Stats et Probabilités** : Lois, Tests, Régression\n• **Économie** : Microéconomie, Macroéconomie, Théories\n• **Informatique** : Python, Excel\n• **Spécialités Master** : Finance, Comptabilité, Management, RH, Marketing\n\nPosez votre première question !`);
 }
 function newConversation(){
   if(!CU)return;
@@ -846,7 +846,7 @@ async function sendMsg(){
   if(!CU){showScreen('auth');return}
   if(!isPrem()&&(CU.questionsToday||0)>=3){toast('Limite 3 questions/jour. Passez Premium !','var(--danger)');openPayment('weekly');return}
 
-  const apiKey=localStorage.getItem('sceg_gemini_key')||'';
+  const apiKey=localStorage.getItem('sceg_or_key')||'';
   if(!apiKey){toast('Clé API Gemini non configurée. Contactez l\'admin.','var(--danger)');return}
 
   const msg=txt||(attached?`[Fichier : ${attached.name}]`:'');
@@ -871,21 +871,28 @@ async function sendMsg(){
     const hist=(DB.convs[key]||[]).slice(-12).map(m=>({role:m.role==='ai'?'model':'user',parts:[{text:m.content}]}));
     const sysPrompt=buildPrompt();
 
+    const hist2=(DB.convs[key]||[]).slice(-12).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.content}));
     const body={
-      contents:[
-        ...hist,
-        {role:'user',parts:[{text:msg+fileInfo}]}
-      ],
-      systemInstruction:{parts:[{text:sysPrompt}]},
-      generationConfig:{maxOutputTokens:1500,temperature:0.7}
+      model:'google/gemini-2.0-flash-exp:free',
+      messages:[
+        {role:'system',content:sysPrompt},
+        ...hist2,
+        {role:'user',content:msg+fileInfo}
+      ]
     };
-
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+apiKey,
+        'HTTP-Referer':'https://sceg-wiki.github.io',
+        'X-Title':'SCEG Wiki'
+      },
+      body:JSON.stringify(body)
+    });
     const data=await res.json();
-
-    if(data.error)throw new Error(data.error.message);
-    const reply=data.candidates?.[0]?.content?.parts?.[0]?.text||'Désolé, une erreur est survenue.';
+    if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
+    const reply=data.choices?.[0]?.message?.content||'Désolé, une erreur est survenue.';
     hideTyping();bubble('ai',reply);
     DB.convs[key].push({role:'ai',content:reply,ts:Date.now()});
     if(DB.convs[key].length>40)DB.convs[key]=DB.convs[key].slice(-40);
@@ -986,7 +993,7 @@ function loadAdmin(){
       </div></div>`).join('');
   renderTable(DB.users);
   setTimeout(()=>{
-    const ex=localStorage.getItem('sceg_gemini_key');
+    const ex=localStorage.getItem('sceg_or_key');
     const inp=document.getElementById('gemini-key-input');
     const st=document.getElementById('apikey-status');
     if(inp&&ex){inp.value=ex;st.textContent='Clé configurée et active';st.style.color='var(--ok)';}
@@ -1030,11 +1037,11 @@ function rejectPayment(id){
 }
 function saveGeminiKey(){
   const key=document.getElementById('gemini-key-input').value.trim();
-  if(!key||!key.startsWith('AIza')){toast('Clé API Gemini invalide (doit commencer par AIza)','var(--danger)');return}
-  localStorage.setItem('sceg_gemini_key',key);
+  if(!key){toast('Collez votre clé sk-or-...','var(--danger)');return}
+  localStorage.setItem('sceg_or_key',key);
   document.getElementById('apikey-status').textContent='Clé configurée et active';
   document.getElementById('apikey-status').style.color='var(--ok)';
-  toast('Clé Gemini enregistrée et active !','var(--ok)');
+  toast('Clé OpenRouter enregistrée ! Le wiki répond maintenant.','var(--ok)');
 }
 function exportUsers(){
   const csv='Nom,Email,Spécialité,Plan,Inscrit\n'+DB.users.map(u=>`${u.name},${u.email},${u.speciality||''},${u.plan},${u.joined||''}`).join('\n');
