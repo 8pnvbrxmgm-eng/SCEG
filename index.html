@@ -604,6 +604,7 @@ h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif}
       <div class="ni" onclick="setSubject('Marketing')"><span class="ico">Mk</span> Marketing</div>
       <div class="sb-sec">Compte</div>
       <div class="ni" onclick="openPayment('weekly')"><span class="ico">*</span> Passer Premium</div>
+      <div class="ni" onclick="document.getElementById('receipt-modal').classList.add('open')"><span class="ico">R</span> Envoyer un reçu</div>
       <div class="ni" onclick="doLogout()"><span class="ico">←</span> Déconnexion</div>
     </div>
     <div class="sb-foot">
@@ -715,7 +716,39 @@ h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif}
     </div>
     <div class="modal-btns">
       <button class="btn btn-ghost" onclick="closeModal('payment-modal')">Fermer</button>
-      <button class="btn btn-em" onclick="confirmPayment()">J'ai effectué le virement</button>
+      <button class="btn btn-em" onclick="confirmPayment()">Envoyer mon reçu</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIPT MODAL -->
+<div class="overlay" id="receipt-modal">
+  <div class="modal">
+    <h2>Envoyer mon reçu CCP</h2>
+    <p style="color:var(--mist);font-size:.875rem;margin-bottom:1.5rem">Remplissez ce formulaire après avoir effectué le virement. L'admin activera votre compte sous 24h.</p>
+    <div class="field"><label>Votre nom complet</label><input type="text" id="rec-name" placeholder="Prénom Nom"></div>
+    <div class="field"><label>Votre email inscrit</label><input type="email" id="rec-email" placeholder="votre@email.com"></div>
+    <div class="field">
+      <label>Formule payée</label>
+      <select id="rec-plan" style="width:100%;padding:.65rem 1rem;border-radius:var(--r-s);background:var(--ink3);border:1px solid var(--line);color:var(--snow);font-family:'Outfit',sans-serif;font-size:.875rem;outline:none">
+        <option value="daily">1 Jour — 100 DA</option>
+        <option value="weekly">1 Semaine — 550 DA</option>
+        <option value="monthly">1 Mois — 1100 DA</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Photo du reçu</label>
+      <label style="display:flex;align-items:center;gap:10px;padding:.65rem 1rem;background:var(--ink3);border:1px solid var(--line);border-radius:var(--r-s);cursor:pointer">
+        <span id="rec-file-name" style="font-size:.85rem;color:var(--mist)">Cliquez pour joindre une photo...</span>
+        <input type="file" id="rec-file" accept=".jpg,.jpeg,.png,.pdf" style="display:none" onchange="document.getElementById('rec-file-name').textContent=this.files[0]?.name||'Aucun fichier'">
+      </label>
+    </div>
+    <div style="background:var(--ink3);border-radius:var(--r-s);padding:1rem;font-size:.8rem;color:var(--mist);margin-bottom:1rem;border:1px solid var(--line)">
+      Votre reçu sera envoyé à <strong style="color:var(--em2)">heebuchhhmoh@icloud.com</strong> avec toutes vos informations.
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeModal('receipt-modal')">Annuler</button>
+      <button class="btn btn-em" onclick="submitReceipt()">Envoyer le reçu</button>
     </div>
   </div>
 </div>
@@ -873,7 +906,7 @@ async function sendMsg(){
 
     const hist2=(DB.convs[key]||[]).slice(-12).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.content}));
     const body={
-      model:'google/gemini-2.0-flash-exp:free',
+      model:'mistralai/mistral-7b-instruct:free',
       messages:[
         {role:'system',content:sysPrompt},
         ...hist2,
@@ -963,11 +996,60 @@ function selectPlan(plan){
   document.getElementById(`opt-${plan}`).classList.add('sel');
 }
 function confirmPayment(){
+  closeModal('payment-modal');
+  // Pre-fill receipt modal with user info
+  if(CU){
+    document.getElementById('rec-name').value=CU.name||'';
+    document.getElementById('rec-email').value=CU.email||'';
+    document.getElementById('rec-plan').value=selPlan;
+  }
+  document.getElementById('receipt-modal').classList.add('open');
+}
+
+async function submitReceipt(){
+  const name=document.getElementById('rec-name').value.trim();
+  const email=document.getElementById('rec-email').value.trim();
+  const plan=document.getElementById('rec-plan').value;
+  const file=document.getElementById('rec-file').files[0];
+  if(!name||!email){toast('Remplissez votre nom et email','var(--danger)');return}
+  
   const prices={daily:100,weekly:550,monthly:1100};
-  const labels={daily:'1 jour',weekly:'1 semaine',monthly:'1 mois'};
-  DB.payments.push({id:Date.now(),userId:CU?.id,userEmail:CU?.email,userName:CU?.name,plan:selPlan,amount:prices[selPlan],label:labels[selPlan],status:'pending',date:new Date().toLocaleDateString('fr-FR')});
-  save();closeModal('payment-modal');
-  toast('Demande enregistrée ! Envoyez le reçu à heebuchhhmoh@icloud.com','var(--ok)');
+  const labels={daily:'1 Jour — 100 DA',weekly:'1 Semaine — 550 DA',monthly:'1 Mois — 1100 DA'};
+  
+  // Save payment request in DB
+  DB.payments.push({
+    id:Date.now(),userId:CU?.id,userEmail:email,userName:name,
+    plan:plan,amount:prices[plan],label:labels[plan],
+    status:'pending',date:new Date().toLocaleDateString('fr-FR'),
+    hasReceipt:!!file
+  });
+  save();
+  
+  // Use FormSubmit to send email with receipt
+  const formData=new FormData();
+  formData.append('_to','heebuchhhmoh@icloud.com');
+  formData.append('_subject','Nouveau reçu CCP — SCEG Wiki');
+  formData.append('_template','table');
+  formData.append('Nom',name);
+  formData.append('Email',email);
+  formData.append('Formule',labels[plan]);
+  formData.append('Date',new Date().toLocaleDateString('fr-FR'));
+  if(file) formData.append('Recu',file);
+  
+  try{
+    const res=await fetch('https://formsubmit.co/ajax/heebuchhhmoh@icloud.com',{
+      method:'POST',
+      body:formData
+    });
+    const data=await res.json();
+    closeModal('receipt-modal');
+    toast('Reçu envoyé ! Votre compte sera activé sous 24h.','var(--ok)');
+    document.getElementById('rec-file').value='';
+    document.getElementById('rec-file-name').textContent='Cliquez pour joindre une photo...';
+  }catch(err){
+    closeModal('receipt-modal');
+    toast('Reçu enregistré ! Envoyez aussi une photo à heebuchhhmoh@icloud.com','var(--ok)');
+  }
 }
 
 /* ══ ADMIN ══ */
